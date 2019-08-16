@@ -15,6 +15,8 @@
 #include <gazebo/msgs/msgs.hh>
 #include <vector>
 #include <math.h>
+#include <ros/ros.h>
+#include <std_msgs/Float64.h>
 
 namespace gazebo
 {
@@ -25,14 +27,14 @@ namespace gazebo
 		private:
 			/// \brief Pointer to the model.
 			physics::ModelPtr model;
-			/// \brief Pointer to the joint.
-			physics::Joint_V joints; // All the joints
-			std::vector< int > rev_joints; //Revolute Joints
 			/// \brief A PID controller for the joint.
 			std::vector< common::PID > pids;
 			/// \brief For comunications
 			transport::NodePtr node;
 			transport::SubscriberPtr sub;
+			/// \brief ROS
+			std::unique_ptr<ros::NodeHandle> rosNode;
+			std::vector< ros::Publisher > pubs;
 			
 			void OnMsg(ConstVector3dPtr &_msg){
 				double x, y, z;
@@ -47,8 +49,10 @@ namespace gazebo
 				std::cerr << "----> O valor de Q1 é " << q1 << " <----\n";
 				std::cerr << "----> O valor de Q2 é " << q2 << " <----\n\n";
 				
-				setVelocity( 0, q1 );
-				setVelocity( 2, q2 );
+				if( q1 == q1 && q2 == q2 ){ //NaN check
+					setVelocity( 0, q1 );
+					setVelocity( 2, q2 );
+				}
 			}
 			
 			double calculateQ2( const double &_x, const double &_y ){
@@ -73,17 +77,6 @@ namespace gazebo
 				if( _x < 0 ) q1 = q1 + 3.14159;
 				return q1;
 			}
-			
-			void filterRevoluteJoints(){
-				const physics::Base::EntityType revolute = physics::Base::HINGE_JOINT;
-				
-				const int len = this->model->GetJointCount();
-				for(int i = 0; i < len; i++){
-					if( this->joints[i]->HasType(revolute) ){
-						this->rev_joints.push_back( i );
-					}
-				}
-			}
 		
 		public:
 			/// \brief Constructor
@@ -101,12 +94,6 @@ namespace gazebo
 					return;
 				}
 				this->model = _model;
-				this->joints = _model->GetJoints();
-				pids.push_back( common::PID(200, 10, 0) );
-				pids.push_back( common::PID(60, 10, 0) );
-				pids.push_back( common::PID(100, 10, 0) );
-				pids.push_back( common::PID(60, 10, 0) );
-				pids.push_back( common::PID(60, 10, 0) );
 				// Create the node
 				this->node = transport::NodePtr(new transport::Node());
 				#if GAZEBO_MAJOR_VERSION < 8
@@ -115,24 +102,36 @@ namespace gazebo
 					this->node->Init(this->model->GetWorld()->Name());
 				#endif
 				
-				this->filterRevoluteJoints();
-				
-				//Create PID controllers for every joint and set it to 0
-				for(int i=0; i < rev_joints.size(); i++){
-					physics::JointPtr j = this->joints[this->rev_joints[i]];
-					this->model->GetJointController()->SetVelocityPID( j->GetScopedName(), this->pids[i] );
-					this->model->GetJointController()->SetVelocityTarget( j->GetScopedName(), 0 );
-				}
 				// Subscribe to the topic, and register a callback
 				std::string topicName = "~/" + this->model->GetName() + "/pos_cmd";
 				this->sub = this->node->Subscribe( topicName, &TrajectoryVelocityControllPlugin::OnMsg, this );
 				
-				// Just output a message
+				
+				// Initialize ros, if it has not already bee initialized.
+				if (!ros::isInitialized())
+				{
+					int argc = 0;
+					char **argv = NULL;
+					ros::init(argc, argv, "gazebo_client", ros::init_options::NoSigintHandler);
+				}
+
+				// Create our ROS node. This acts in a similar manner to
+				// the Gazebo node
+				this->rosNode.reset(new ros::NodeHandle("gazebo_client"));
+				this->pubs.push_back( this->rosNode->advertise<std_msgs::Float64>("/robotic_arm/joint1_controller/command", 100) );
+				this->pubs.push_back( this->rosNode->advertise<std_msgs::Float64>("/robotic_arm/joint2_controller/command", 100) );
+				this->pubs.push_back( this->rosNode->advertise<std_msgs::Float64>("/robotic_arm/joint4_controller/command", 100) );
+				this->pubs.push_back( this->rosNode->advertise<std_msgs::Float64>("/robotic_arm/joint5_controller/command", 100) );
+				this->pubs.push_back( this->rosNode->advertise<std_msgs::Float64>("/robotic_arm/joint7_controller/command", 100) );
+
 				std::cerr << "\nThe Joint Controll Plugin is attach to model[" << _model->GetName() << "]\n";
 			}
 			
 			void setVelocity(int i, double &_pos){
-				this->model->GetJointController()->SetVelocityTarget( this->joints[ this->rev_joints[i] ]->GetScopedName(), _pos );
+				std_msgs::Float64 msg;
+				msg.data = _pos;
+				//send to controllers
+				this->pubs[i].publish(msg);
 			}
 		
 	};

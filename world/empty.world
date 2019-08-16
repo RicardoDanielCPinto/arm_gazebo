@@ -9,7 +9,7 @@
 		<include>
 			<uri>model://robotic_arm</uri>
 			
-			<!--<plugin name="trajectory_controll" filename="libtrajectory_velocity_controll_plugin.so"/>-->
+			<plugin name="trajectory_controll" filename="libtrajectory_velocity_controll_plugin.so"/>
 			<plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
 				<robotNamespace>/robotic_arm</robotNamespace>
 			</plugin>
