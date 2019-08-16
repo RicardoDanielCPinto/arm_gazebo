@@ -1,0 +1,22 @@
+<launch>
+
+	<include file="$(find gazebo_ros)/launch/empty_world.launch">
+		<arg name="world_name" value="$(find arm_gazebo)/world/empty.world"/>
+	</include>
+	
+	<!-- Controllers -->
+	<param name="robot_description" textfile="$(find arm_gazebo)/models/robotic_arm/model.urdf" />
+	<rosparam file="$(find arm_gazebo)/config/joints.yaml" command="load"/>
+	<node name="controller_spawner" 
+		pkg="controller_manager" 
+		ns="/robotic_arm"
+		type="spawner" respawn="false" output="screen"
+		args="joint1_controller joint2_controller joint4_controller joint5_controller joint7_controller joint_state_controller"/>
+	
+	<!--
+	<node name="robot_state_publisher1" pkg="robot_state_publisher" type="robot_state_publisher">
+		<remap from="joint_states" to="/robotic_arm/joint_states"/>
+	</node>
+	-->
+  
+</launch>

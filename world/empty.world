@@ -1,0 +1,18 @@
+<sdf version="1.4">
+	<world name="default">
+		<include>
+			<uri>model://sun</uri>
+		</include>
+		<include>
+			<uri>model://ground_plane</uri>
+		</include>
+		<include>
+			<uri>model://robotic_arm</uri>
+			
+			<!--<plugin name="trajectory_controll" filename="libtrajectory_velocity_controll_plugin.so"/>-->
+			<plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+				<robotNamespace>/robotic_arm</robotNamespace>
+			</plugin>
+		</include>
+	</world>
+</sdf>
